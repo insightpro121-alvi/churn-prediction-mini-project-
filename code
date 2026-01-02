@@ -1,0 +1,142 @@
+# =========================================================
+# IMPORT LIBRARIES wow jango mango 
+# =========================================================
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score,
+    f1_score, roc_auc_score
+)
+
+# =========================================================
+# 2 GENERATE SYNTHETIC DATASET (5000 ROWS)
+# =========================================================
+np.random.seed(42)
+n = 5000
+
+df = pd.DataFrame({
+    'gender': np.random.choice(['Male','Female'], size=n),
+    'SeniorCitizen': np.random.choice([0,1], size=n, p=[0.85,0.15]),
+    'Partner': np.random.choice(['Yes','No'], size=n),
+    'Dependents': np.random.choice(['Yes','No'], size=n),
+    'tenure': np.random.randint(0, 72, size=n),
+    'PhoneService': np.random.choice(['Yes','No'], size=n, p=[0.9,0.1]),
+    'MultipleLines': np.random.choice(['Yes','No','No phone service'], size=n),
+    'InternetService': np.random.choice(['DSL','Fiber optic','No'], size=n, p=[0.3,0.6,0.1]),
+    'OnlineSecurity': np.random.choice(['Yes','No','No internet service'], size=n),
+    'OnlineBackup': np.random.choice(['Yes','No','No internet service'], size=n),
+    'DeviceProtection': np.random.choice(['Yes','No','No internet service'], size=n),
+    'TechSupport': np.random.choice(['Yes','No','No internet service'], size=n),
+    'StreamingTV': np.random.choice(['Yes','No','No internet service'], size=n),
+    'StreamingMovies': np.random.choice(['Yes','No','No internet service'], size=n),
+    'Contract': np.random.choice(['Month-to-month','One year','Two year'], size=n, p=[0.6,0.25,0.15]),
+    'PaperlessBilling': np.random.choice(['Yes','No'], size=n),
+    'PaymentMethod': np.random.choice(['Electronic check', 'Mailed check', 'Bank transfer', 'Credit card'], size=n),
+    'MonthlyCharges': np.random.uniform(20,120,size=n),
+})
+
+df['TotalCharges'] = df['MonthlyCharges'] * df['tenure'] + np.random.normal(0, 20, n)
+
+# Churn: simulate higher churn for month-to-month + short tenure + high charges
+df['Churn'] = np.where(
+    (df['Contract']=='Month-to-month') & (df['tenure']<12) & (df['MonthlyCharges']>70),
+    1, 0
+)
+
+# Purchase Probability Label (engineered)
+df['PurchaseNextMonth'] = np.where(
+    (df['tenure']>6) & (df['MonthlyCharges']>50),
+    1, 0
+)
+
+# =========================================================
+# 3 DATA PREPROCESSING
+# =========================================================
+df = pd.get_dummies(df, drop_first=True)
+
+X = df.drop(['Churn','PurchaseNextMonth'], axis=1)
+y_churn = df['Churn']
+y_purchase = df['PurchaseNextMonth']
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# =========================================================
+# 4 TRAIN-TEST SPLIT
+# =========================================================
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y_churn, test_size=0.2, random_state=42, stratify=y_churn
+)
+
+X_train_p, X_test_p, y_train_p, y_test_p = train_test_split(
+    X_scaled, y_purchase, test_size=0.2, random_state=42, stratify=y_purchase
+)
+
+# =========================================================
+# 5 MODEL DEVELOPMENT
+# =========================================================
+# Logistic Regression
+log_model = LogisticRegression(max_iter=1000)
+log_model.fit(X_train, y_train)
+
+# Random Forest
+rf_model = RandomForestClassifier(n_estimators=200, max_depth=10, random_state=42)
+rf_model.fit(X_train, y_train)
+
+# =========================================================
+# 6 MODEL EVALUATION FUNCTION
+# =========================================================
+def evaluate_model(model, X_test, y_test, name="Model"):
+    y_pred = model.predict(X_test)
+    y_prob = model.predict_proba(X_test)[:,1]
+    
+    print(f"\n{name} Evaluation:")
+    print("Accuracy :", accuracy_score(y_test, y_pred))
+    print("Precision:", precision_score(y_test, y_pred))
+    print("Recall   :", recall_score(y_test, y_pred))
+    print("F1 Score :", f1_score(y_test, y_pred))
+    print("ROC-AUC  :", roc_auc_score(y_test, y_prob))
+
+# =========================================================
+# 7 EVALUATE CHURN MODELS
+# =========================================================
+evaluate_model(log_model, X_test, y_test, "Logistic Regression")
+evaluate_model(rf_model, X_test, y_test, "Random Forest")
+
+# =========================================================
+# 8 PURCHASE PROBABILITY PREDICTION
+# =========================================================
+rf_purchase = RandomForestClassifier(n_estimators=200, random_state=42)
+rf_purchase.fit(X_train_p, y_train_p)
+
+purchase_probs = rf_purchase.predict_proba(X_test_p)[:,1]
+print("\nSample Purchase Probabilities (first 10):")
+print(purchase_probs[:10])
+
+# =========================================================
+# 9 HYPERPARAMETER OPTIMIZATION (Random Forest)
+# =========================================================
+param_grid = {'n_estimators':[100,200], 'max_depth':[5,10,None]}
+
+grid = GridSearchCV(
+    RandomForestClassifier(random_state=42),
+    param_grid,
+    cv=5,
+    scoring='roc_auc'
+)
+grid.fit(X_train, y_train)
+
+best_model = grid.best_estimator_
+evaluate_model(best_model, X_test, y_test, "Tuned Random Forest")
+
+# =========================================================
+# 1 FINAL OUTPUT
+# =========================================================
+print("\n End-to-End Churn & Purchase Probability Prediction Completed!")
