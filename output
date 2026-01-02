@@ -1,0 +1,23 @@
+Logistic Regression Evaluation:
+Accuracy : 0.983
+Precision: 0.8717948717948718
+Recall   : 0.7391304347826086
+F1 Score : 0.8
+ROC-AUC  : 0.9968553459119497
+
+Random Forest Evaluation:
+Accuracy : 0.996
+Precision: 1.0
+Recall   : 0.9130434782608695
+F1 Score : 0.9545454545454546
+ROC-AUC  : 0.9999316379546076
+
+Sample Purchase Probabilities (first 10):
+[0.975 0.97  0.99  0.075 0.98  0.895 0.035 0.84  0.99  0.04 ]
+
+Tuned Random Forest Evaluation:
+Accuracy : 0.996
+Precision: 1.0
+Recall   : 0.9130434782608695
+F1 Score : 0.9545454545454546
+ROC-AUC  : 0.9999316379546076
